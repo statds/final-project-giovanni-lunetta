@@ -841,6 +841,131 @@ for var in demographics.columns[:-1]:  # exclude the last column (Borough)
 ```
 :::
 
+## Statistical Testing
+::: {.panel-tabset}
+### Code
+
+We can also test to see if specific Complaint Types are different among the demographics:
+
+```{python}
+#| echo: true
+#| eval: false
+
+top20complaints = df['Complaint Type'].value_counts().nlargest(20).index.tolist()
+
+df['top20complaint'] = 'other'
+
+df = df.reset_index(drop=True)
+
+for i in range(len(df)):
+    if df.loc[i, 'Complaint Type'] in top20complaints:
+        df.loc[i, 'top20complaint'] = df.loc[i, 'Complaint Type']
+
+import scipy.stats as stats
+
+df = df.dropna()
+
+# Create an empty dictionary to store the F-statistic and p-value for each demographic variable
+anova_results = {}
+
+# Loop over the demographic variables and compute the ANOVA for each variable
+for var in ['housing_units', 'occupied_housing_units', 'median_home_value', 'population', 'median_household_income', 'population_density']:
+    var_by_complaint = df.groupby('top20complaint')[var].apply(list)
+    f_stat, p_value = stats.f_oneway(*var_by_complaint)
+    anova_results[var] = {'F-statistic': f_stat, 'p-value': p_value}
+
+# Print the ANOVA table
+print('{:<25} {:<15} {:<15}'.format('Variable', 'F-statistic', 'p-value'))
+print('-' * 55)
+for var, results in anova_results.items():
+    print('{:<25} {:<15.2f} {:<15.2e}'.format(var, results['F-statistic'], results['p-value']))
+```
+### Output
+```{python}
+#| echo: false
+#| eval: true
+
+top20complaints = df['Complaint Type'].value_counts().nlargest(20).index.tolist()
+
+df['top20complaint'] = 'other'
+
+df = df.reset_index(drop=True)
+
+for i in range(len(df)):
+    if df.loc[i, 'Complaint Type'] in top20complaints:
+        df.loc[i, 'top20complaint'] = df.loc[i, 'Complaint Type']
+
+import scipy.stats as stats
+
+df = df.dropna()
+
+# Create an empty dictionary to store the F-statistic and p-value for each demographic variable
+anova_results = {}
+
+# Loop over the demographic variables and compute the ANOVA for each variable
+for var in ['housing_units', 'occupied_housing_units', 'median_home_value', 'population', 'median_household_income', 'population_density']:
+    var_by_complaint = df.groupby('top20complaint')[var].apply(list)
+    f_stat, p_value = stats.f_oneway(*var_by_complaint)
+    anova_results[var] = {'F-statistic': f_stat, 'p-value': p_value}
+
+# Print the ANOVA table
+print('{:<25} {:<15} {:<15}'.format('Variable', 'F-statistic', 'p-value'))
+print('-' * 55)
+for var, results in anova_results.items():
+    print('{:<25} {:<15.2f} {:<15.2e}'.format(var, results['F-statistic'], results['p-value']))
+```
+:::
+
+
+## Statistical Testing
+::: {.panel-tabset}
+### Code
+
+The ANOVA test only tells us that there are differences between the groups, but not which groups are different from each other. To explore this further, we can perform a post-hoc test known as Tukey's HSD test to identify which groups are significantly different from each other.
+
+```{python}
+#| echo: true
+#| eval: false
+
+import statsmodels.stats.multicomp as mc
+
+# Create an empty dictionary to store the Tukey HSD results for each demographic variable
+tukey_results = {}
+
+# Loop over the demographic variables and compute the Tukey HSD test for each variable
+for var in ['housing_units', 'occupied_housing_units', 'median_home_value', 'population', 'median_household_income', 'population_density']:
+    var_by_complaint = df.groupby('top20complaint')[var].apply(list)
+    tukey = mc.MultiComparison(df[var], df['top20complaint'])
+    tukey_results[var] = tukey.tukeyhsd().summary()
+
+# Print the Tukey HSD results
+for var, results in tukey_results.items():
+    print(var)
+    print(results)
+```
+### Output
+```{python}
+#| echo: false
+#| eval: true
+
+import statsmodels.stats.multicomp as mc
+
+# Create an empty dictionary to store the Tukey HSD results for each demographic variable
+tukey_results = {}
+
+# Loop over the demographic variables and compute the Tukey HSD test for each variable
+for var in ['housing_units', 'occupied_housing_units', 'median_home_value', 'population', 'median_household_income', 'population_density']:
+    var_by_complaint = df.groupby('top20complaint')[var].apply(list)
+    tukey = mc.MultiComparison(df[var], df['top20complaint'])
+    tukey_results[var] = tukey.tukeyhsd().summary()
+
+# Print the Tukey HSD results
+for var, results in tukey_results.items():
+    print(var)
+    print(results)
+```
+:::
+
 ## Modeling
 What if we want to create a model that predicts which Borough the complaint is coming from?
 
@@ -1111,10 +1236,14 @@ In terms of data in reference to Borough and Demograpics:
 
 Each demographic variable is different between each set of boroughs inlcuding the boroughs that had similar complaint types as we conluded previously. 
 
+In terms of Complaint Type and Demographic:
+
+There are many combinations in which based on the specific demographic, the difference between complaint types are not significant, but for the most part, they are statistically significant.
+
 In terms of the neural network model:
 
 Because of our previous statistical conclusions, using demographic variables along with the other variables such as Complaint Type and duration, we would expect a model to be able to accurately predict which borough the complaint was coming from. And, although the borough of the request is known upon recieving the call, the implications of the predictors themselves can guide future research.
 
 Based on the results, the model was able to predict with strong accuracy which borough the complaints were coming from.
 
-Overall, I would suggest that it is worthwile for local policy makers across boroughs to identify which complaints are most common in their area and allocate resources accordingly in order to save time and money. In addition to this, based on the significance of demographic variables, I think further reasearch could be done to associate specific complaints to specific demographics and utilize that information accordingly.
+Overall, I would suggest that it is worthwile for local policy makers across boroughs to identify which complaints are most common in their area and allocate resources accordingly in order to save time and money. In addition to this, based on the significance of demographic variables and their relationship with specific complaint types, I think further reasearch could be done to associate these complaints to specific demographics and utilize that information accordingly.
