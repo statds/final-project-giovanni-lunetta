@@ -3,8 +3,8 @@ title: "Investigating 311 Complaints in NYC"
 author: "Giovanni Lunetta"
 format:
   revealjs:
-    height: 900
-    width: 1600 
+    height: 500
+    width: 850 
     embed-resources: true
     slide-number: true
     smaller: true
@@ -20,18 +20,57 @@ execute:
   cache: true
 ---
 
+## Outline
+
+1. Introduction
+
+2. Specific Aims
+
+3. Data
+
+4. Data Cleaning
+
+5. Visualizations
+
+6. Statistical Testing
+
+7. Modeling
+
+8. Conclusions
+
+# Introduction
+
 ## Introduction
 
-This research aims to investigate the relationship between specific types of 311 complaints and the boroughs they are most common in, as well as the demographic characteristics of those boroughs. This research is important as it can help identify potential areas for improvement in service delivery and policy development in New York City. Previous studies have analyzed the relationship between 311 complaints and various demographic factors such as income, race, and education level. However, there is a need to further explore the variations in 311 complaints across different boroughs.
+- Research Objective: Investigate the relationship between specific types of 311 complaints and the boroughs they are most common in, as well as the demographic characteristics of those boroughs.
 
-## Specific aims
+- Importance: Identify potential areas for improvement in service delivery and policy development in New York City.
 
-The research question for this study is: Are there specific types of 311 complaints that are more common in certain boroughs of NYC, and is there a relationship between borough demographics and the types of complaints received? The hypothesis is that there are differences in the types of 311 complaints across the boroughs, and these differences are related to the demographic characteristics of each borough.
+- Previous Studies: Analyzed relationship between 311 complaints and demographic factors such as income, race, and education level.
+
+- Need: Further explore variations in 311 complaints across different boroughs.
+
+# Specific Aims 
+
+## Specific Aims
+
+- Research question: Are there specific types of 311 complaints that are more common in certain boroughs of NYC, and is there a relationship between borough demographics and the types of complaints received?
+
+- Hypothesis: There are differences in the types of 311 complaints across the boroughs, and these differences are related to the demographic characteristics of each borough.
+
+# Data
 
 ## Data
 
-The data for this study was collected from the NYC Open Data Portal, which contains information on all 311 service requests received by the City of New York since 2010. The data set will be filtered to include only the complaints from January 2023. The sampling scheme include all 311 complaints received by all Agency's. The data set will include information on the borough, complaint type, and other relevant demographic information such as population density, and median household income.
+- Data source: NYC Open Data Portal, which contains information on all 311 service requests received by the City of New York since 2010.
 
+- Data collection: The data set will be filtered to include only the complaints from January 2023.
+
+- Sampling scheme: All 311 complaints received by all agencies will be included in the data set.
+
+- Data set: The data set will include information on the borough, complaint type, and other relevant demographic information such as population density, and median household income.
+
+# Cleaning Data
 
 ## Cleaning Data
 
@@ -227,8 +266,19 @@ df = df[~df['Complaint Type'].isin(to_remove2)]
 df.to_csv('/Users/giovanni-lunetta/stat_3255/stat_3255_final/data/cleaned.csv', index=False)
 ```
 
+## Data Cleaning
 
-## Statistical Testing
+- Removed unecessary, repetitive and missing data.
+
+- Created duration varibles
+
+- Merged demographic variables
+
+- Changed all noise complaints to `noise`.
+
+# Visualizations
+
+## Visualizations
 Lets load in the cleaned dataset and check our columns:
 ```{python}
 #| echo: true
@@ -237,7 +287,7 @@ df = pd.read_csv('/Users/giovanni-lunetta/stat_3255/stat_3255_final/data/cleaned
 df.columns
 ```
 
-## Statistical Testing
+## Visualizations
 ::: {.panel-tabset}
 ### Code
 The first task is to look at the Top 20 Complaints for each borough:
@@ -268,10 +318,10 @@ for borough in borough_complaint_counts['Borough'].unique():
 ```
 :::
 
-## Statistical Testing
+## Visualizations
 ::: {.panel-tabset}
 ### Code
-What if we want to visualize the Top 20 Complaints Per Bourough?:
+What if we want to visualize this better?:
 ```{python}
 #| echo: true
 #| eval: false
@@ -340,10 +390,10 @@ for borough in df['Borough'].unique():
     plt.show()
 ```
 :::
-## Statistical Testing
+## Visualizations
 ::: {.panel-tabset}
 ### Code
-Lets create a contingency table to perform more statistical tests:
+Next, we can create a contingency table to perform statistical tests (talked about later):
 ```{python}
 #| echo: true
 #| eval: false
@@ -403,9 +453,236 @@ contingency_table
 ```
 :::
 
+## Visualizations
+We can also look at the distribution of complaint types on a map of NYC: 
+
+<file:///Users/giovanni-lunetta/stat_3255/stat_3255_final/graphs/heatmap.html>
+
+```{python}
+#| echo: true
+#| eval: false
+
+import folium
+from folium.plugins import HeatMap
+
+# Get the top 20 complaints
+top_20_complaints = df['Complaint Type'].value_counts().nlargest(20).index
+
+# create a new dataframe with the frequency of complaints by borough for the top 20 complaints
+df_heatmap = df[df['Complaint Type'].isin(top_20_complaints)].groupby(['Borough', 'Complaint Type']).size().reset_index(name='Frequency')
+
+# create a pivot table with the frequency of complaints for each borough and complaint type
+heatmap_data = pd.pivot_table(df_heatmap, values='Frequency', index=['Borough'], columns=['Complaint Type'])
+
+# create a list of colors for the heatmap
+colors = ['yellow', 'orange', 'red', 'purple', 'blue', 'green']
+
+# create a folium map centered on New York City
+map_heatmap = folium.Map(location=[40.7128, -74.0060], zoom_start=10)
+
+# create a heatmap layer for each complaint type
+for i, c in enumerate(heatmap_data.columns):
+    # sample the data to reduce the number of points on the map
+    sample_size = int(len(df[df['Complaint Type'] == c]) * 0.01)
+    df_sample = df[df['Complaint Type'] == c].sample(n=sample_size)
+    heatmap_layer = HeatMap(list(zip(df_sample['Latitude'], df_sample['Longitude'])),
+                            name=c,
+                            min_opacity=0.5,
+                            max_zoom=18,
+                            radius=15,
+                            blur=10,
+                            gradient={0.4: colors[i%len(colors)-1], 0.65: colors[i%len(colors)-2], 1: colors[i%len(colors)-3]}
+                           )
+    heatmap_layer.add_to(map_heatmap)
+
+# add a layer control to toggle between the different complaint types
+folium.LayerControl().add_to(map_heatmap)
+
+# save the map as an HTML file
+map_heatmap.save('heatmap.html')
+```
+
+## Visualizations
+Now with a cluster graph:
+
+<file:///Users/giovanni-lunetta/stat_3255/stat_3255_final/graphs/top20_complaints_map.html>
+
+```{python}
+#| echo: true
+#| eval: false
+
+import folium
+from folium.plugins import MarkerCluster
+
+# Get the top 20 complaints
+top_20_complaints = df['Complaint Type'].value_counts().nlargest(20).index
+
+# Create a new dataframe with only the top 20 complaints
+df_top_20_complaints = df[df['Complaint Type'].isin(top_20_complaints)]
+
+# Create a folium map centered on New York City
+map_complaints = folium.Map(location=[40.7128, -74.0060], zoom_start=10)
+
+# Create a MarkerCluster layer for each complaint type
+for c in top_20_complaints:
+    # Filter the dataframe to only include the current complaint type
+    df_complaint = df_top_20_complaints[df_top_20_complaints['Complaint Type'] == c]
+    
+    # Create a MarkerCluster layer for the current complaint type
+    mc = MarkerCluster(name=c)
+    
+    # Add a marker to the MarkerCluster layer for each complaint location
+    for lat, lon, address in zip(df_complaint['Latitude'], df_complaint['Longitude'], df_complaint['Incident Address']):
+        folium.Marker(location=[lat, lon], tooltip=address).add_to(mc)
+    
+    # Add the MarkerCluster layer to the map
+    mc.add_to(map_complaints)
+
+# Add a layer control to toggle between the different complaint types
+folium.LayerControl().add_to(map_complaints)
+
+# Display the map
+map_complaints.save("top20_complaints_map.html")
+```
+
+## Visualizations
+::: {.panel-tabset}
+### Code
+Lets turn our attention to demographic factors.
+Here is a visual comparison of the counts of each demographic by borough:
+```{python}
+#| echo: true
+#| eval: false
+
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# select the demographic variables and borough columns
+demographics = df[['housing_units', 'occupied_housing_units', 'median_home_value', 'population', 'median_household_income', 'population_density', 'Borough', 'Incident Zip']]
+
+# drop any rows with missing values
+demographics = demographics.dropna()
+
+# create barplots for each demographic variable
+for var in demographics.columns[:-2]:  # exclude the last two columns (Borough and Incident Zip)
+    plt.figure(figsize=(30, 6))  # set the figure size
+    sns.barplot(x='Incident Zip', y=var, data=demographics, estimator=np.median, dodge=False, hue='Borough')
+    plt.xticks(rotation=90)  # rotate the x-axis labels
+    plt.title(var)
+    plt.show()
+```
+### Output
+```{python}
+#| echo: false
+#| eval: true
+
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# select the demographic variables and borough columns
+demographics = df[['housing_units', 'occupied_housing_units', 'median_home_value', 'population', 'median_household_income', 'population_density', 'Borough', 'Incident Zip']]
+
+# drop any rows with missing values
+demographics = demographics.dropna()
+
+# create barplots for each demographic variable
+for var in demographics.columns[:-2]:  # exclude the last two columns (Borough and Incident Zip)
+    plt.figure(figsize=(30, 6))  # set the figure size
+    sns.barplot(x='Incident Zip', y=var, data=demographics, estimator=np.median, dodge=False, hue='Borough')
+    plt.xticks(rotation=90)  # rotate the x-axis labels
+    plt.title(var)
+    plt.show()
+```
+:::
+
+## Visualizations
+::: {.panel-tabset}
+### Code
+Lets turn our attention to demographic factors.
+Here is a visual comparison of the counts of each demographic by borough:
+```{python}
+#| echo: true
+#| eval: false
+
+import numpy as np
+import seaborn as sns
+
+# select the demographic variables and borough columns
+demographics = df[['housing_units', 'occupied_housing_units', 'median_home_value', 'population', 'median_household_income', 'population_density', 'Borough']]
+
+# drop any rows with missing values
+demographics = demographics.dropna()
+
+# create barplots for each demographic variable
+for var in demographics.columns[:-1]:  # exclude the last column (Borough)
+    sns.barplot(x='Borough', y=var, data=demographics, estimator=np.median)
+    plt.title(var)
+    plt.show()
+```
+### Output
+```{python}
+#| echo: false
+#| eval: true
+
+import numpy as np
+import seaborn as sns
+
+# select the demographic variables and borough columns
+demographics = df[['housing_units', 'occupied_housing_units', 'median_home_value', 'population', 'median_household_income', 'population_density', 'Borough']]
+
+# drop any rows with missing values
+demographics = demographics.dropna()
+
+# create barplots for each demographic variable
+for var in demographics.columns[:-1]:  # exclude the last column (Borough)
+    sns.barplot(x='Borough', y=var, data=demographics, estimator=np.median)
+    plt.title(var)
+    plt.show()
+```
+:::
+
+## Visualizations
+::: {.panel-tabset}
+### Code
+We can also create scatterplots for pairs of demographic variables
+```{python}
+#| echo: true
+#| eval: false
+
+# select the demographic variables and borough columns
+demographics = df[['housing_units', 'occupied_housing_units', 'median_home_value', 'population', 'median_household_income', 'population_density', 'Borough']]
+
+# drop any rows with missing values
+demographics = demographics.dropna()
+
+# create scatterplots for pairs of demographic variables
+sns.pairplot(demographics, hue='Borough')
+plt.show()
+```
+### Output
+```{python}
+#| echo: false
+#| eval: true
+
+# select the demographic variables and borough columns
+demographics = df[['housing_units', 'occupied_housing_units', 'median_home_value', 'population', 'median_household_income', 'population_density', 'Borough']]
+
+# drop any rows with missing values
+demographics = demographics.dropna()
+
+# create scatterplots for pairs of demographic variables
+sns.pairplot(demographics, hue='Borough')
+plt.show()
+```
+:::
+
+# Statistical Testing
+
 ## Statistical Testing
 
-Now lets test it using a Chi-Sqaured test for Contintency:
+Lets start with a Chi-Sqaured test for Contintency:
 
 The null hypothesis for the chi-squared test performed on the contingency table is that there is no association between the Complaint Type and Borough variables in the population. In other words, the observed frequencies in the contingency table are equal to what would be expected by chance alone, given the marginal totals.
 
@@ -581,179 +858,6 @@ for complaint_type, result in results.items():
 ```
 :::
 
-## Visualizations
-Lets check if we can see this visually with a heatmap:
-
-<file:///Users/giovanni-lunetta/stat_3255/stat_3255_final/graphs/heatmap.html>
-
-```{python}
-#| echo: true
-#| eval: false
-
-import folium
-from folium.plugins import HeatMap
-
-# Get the top 20 complaints
-top_20_complaints = df['Complaint Type'].value_counts().nlargest(20).index
-
-# create a new dataframe with the frequency of complaints by borough for the top 20 complaints
-df_heatmap = df[df['Complaint Type'].isin(top_20_complaints)].groupby(['Borough', 'Complaint Type']).size().reset_index(name='Frequency')
-
-# create a pivot table with the frequency of complaints for each borough and complaint type
-heatmap_data = pd.pivot_table(df_heatmap, values='Frequency', index=['Borough'], columns=['Complaint Type'])
-
-# create a list of colors for the heatmap
-colors = ['yellow', 'orange', 'red', 'purple', 'blue', 'green']
-
-# create a folium map centered on New York City
-map_heatmap = folium.Map(location=[40.7128, -74.0060], zoom_start=10)
-
-# create a heatmap layer for each complaint type
-for i, c in enumerate(heatmap_data.columns):
-    # sample the data to reduce the number of points on the map
-    sample_size = int(len(df[df['Complaint Type'] == c]) * 0.01)
-    df_sample = df[df['Complaint Type'] == c].sample(n=sample_size)
-    heatmap_layer = HeatMap(list(zip(df_sample['Latitude'], df_sample['Longitude'])),
-                            name=c,
-                            min_opacity=0.5,
-                            max_zoom=18,
-                            radius=15,
-                            blur=10,
-                            gradient={0.4: colors[i%len(colors)-1], 0.65: colors[i%len(colors)-2], 1: colors[i%len(colors)-3]}
-                           )
-    heatmap_layer.add_to(map_heatmap)
-
-# add a layer control to toggle between the different complaint types
-folium.LayerControl().add_to(map_heatmap)
-
-# save the map as an HTML file
-map_heatmap.save('heatmap.html')
-```
-
-## Visualizations
-Now with a cluster graph:
-
-<file:///Users/giovanni-lunetta/stat_3255/stat_3255_final/graphs/top20_complaints_map.html>
-
-```{python}
-#| echo: true
-#| eval: false
-
-import folium
-from folium.plugins import MarkerCluster
-
-# Get the top 20 complaints
-top_20_complaints = df['Complaint Type'].value_counts().nlargest(20).index
-
-# Create a new dataframe with only the top 20 complaints
-df_top_20_complaints = df[df['Complaint Type'].isin(top_20_complaints)]
-
-# Create a folium map centered on New York City
-map_complaints = folium.Map(location=[40.7128, -74.0060], zoom_start=10)
-
-# Create a MarkerCluster layer for each complaint type
-for c in top_20_complaints:
-    # Filter the dataframe to only include the current complaint type
-    df_complaint = df_top_20_complaints[df_top_20_complaints['Complaint Type'] == c]
-    
-    # Create a MarkerCluster layer for the current complaint type
-    mc = MarkerCluster(name=c)
-    
-    # Add a marker to the MarkerCluster layer for each complaint location
-    for lat, lon, address in zip(df_complaint['Latitude'], df_complaint['Longitude'], df_complaint['Incident Address']):
-        folium.Marker(location=[lat, lon], tooltip=address).add_to(mc)
-    
-    # Add the MarkerCluster layer to the map
-    mc.add_to(map_complaints)
-
-# Add a layer control to toggle between the different complaint types
-folium.LayerControl().add_to(map_complaints)
-
-# Display the map
-map_complaints.save("top20_complaints_map.html")
-```
-
-## Visualizations
-::: {.panel-tabset}
-### Code
-Lets turn our attention to demographic factors.
-Here is a visual comparison of the counts of each demographic by borough:
-```{python}
-#| echo: true
-#| eval: false
-
-import numpy as np
-import seaborn as sns
-
-# select the demographic variables and borough columns
-demographics = df[['housing_units', 'occupied_housing_units', 'median_home_value', 'population', 'median_household_income', 'population_density', 'Borough']]
-
-# drop any rows with missing values
-demographics = demographics.dropna()
-
-# create barplots for each demographic variable
-for var in demographics.columns[:-1]:  # exclude the last column (Borough)
-    sns.barplot(x='Borough', y=var, data=demographics, estimator=np.median)
-    plt.title(var)
-    plt.show()
-```
-### Output
-```{python}
-#| echo: false
-#| eval: true
-
-import numpy as np
-import seaborn as sns
-
-# select the demographic variables and borough columns
-demographics = df[['housing_units', 'occupied_housing_units', 'median_home_value', 'population', 'median_household_income', 'population_density', 'Borough']]
-
-# drop any rows with missing values
-demographics = demographics.dropna()
-
-# create barplots for each demographic variable
-for var in demographics.columns[:-1]:  # exclude the last column (Borough)
-    sns.barplot(x='Borough', y=var, data=demographics, estimator=np.median)
-    plt.title(var)
-    plt.show()
-```
-:::
-
-## Visualizations
-::: {.panel-tabset}
-### Code
-We can also create scatterplots for pairs of demographic variables
-```{python}
-#| echo: true
-#| eval: false
-
-# select the demographic variables and borough columns
-demographics = df[['housing_units', 'occupied_housing_units', 'median_home_value', 'population', 'median_household_income', 'population_density', 'Borough']]
-
-# drop any rows with missing values
-demographics = demographics.dropna()
-
-# create scatterplots for pairs of demographic variables
-sns.pairplot(demographics, hue='Borough')
-plt.show()
-```
-### Output
-```{python}
-#| echo: false
-#| eval: true
-
-# select the demographic variables and borough columns
-demographics = df[['housing_units', 'occupied_housing_units', 'median_home_value', 'population', 'median_household_income', 'population_density', 'Borough']]
-
-# drop any rows with missing values
-demographics = demographics.dropna()
-
-# create scatterplots for pairs of demographic variables
-sns.pairplot(demographics, hue='Borough')
-plt.show()
-```
-:::
-
 ## Statistical Testing
 
 We can run another Kruskal-Wallis test to compare demographic variables (housing units, occupied housing units, median home value, population, median household income, population density) across different boroughs. Therefore, the null hypothesis is that the population medians of each demographic variable are equal across all boroughs, while the alternative hypothesis is that at least one borough has a different population median for a specific demographic variable.
@@ -851,39 +955,7 @@ We can also test to see if specific Complaint Types are different among the demo
 #| echo: true
 #| eval: false
 
-top20complaints = df['Complaint Type'].value_counts().nlargest(20).index.tolist()
-
-df['top20complaint'] = 'other'
-
-df = df.reset_index(drop=True)
-
-for i in range(len(df)):
-    if df.loc[i, 'Complaint Type'] in top20complaints:
-        df.loc[i, 'top20complaint'] = df.loc[i, 'Complaint Type']
-
-import scipy.stats as stats
-
-df = df.dropna()
-
-# Create an empty dictionary to store the F-statistic and p-value for each demographic variable
-anova_results = {}
-
-# Loop over the demographic variables and compute the ANOVA for each variable
-for var in ['housing_units', 'occupied_housing_units', 'median_home_value', 'population', 'median_household_income', 'population_density']:
-    var_by_complaint = df.groupby('top20complaint')[var].apply(list)
-    f_stat, p_value = stats.f_oneway(*var_by_complaint)
-    anova_results[var] = {'F-statistic': f_stat, 'p-value': p_value}
-
-# Print the ANOVA table
-print('{:<25} {:<15} {:<15}'.format('Variable', 'F-statistic', 'p-value'))
-print('-' * 55)
-for var, results in anova_results.items():
-    print('{:<25} {:<15.2f} {:<15.2e}'.format(var, results['F-statistic'], results['p-value']))
-```
-### Output
-```{python}
-#| echo: false
-#| eval: true
+from scipy.stats import kruskal
 
 top20complaints = df['Complaint Type'].value_counts().nlargest(20).index.tolist()
 
@@ -895,76 +967,74 @@ for i in range(len(df)):
     if df.loc[i, 'Complaint Type'] in top20complaints:
         df.loc[i, 'top20complaint'] = df.loc[i, 'Complaint Type']
 
-import scipy.stats as stats
-
 df = df.dropna()
 
-# Create an empty dictionary to store the F-statistic and p-value for each demographic variable
-anova_results = {}
+# Create an empty dictionary to store the H-statistic and p-value for each demographic variable
+kruskal_results = {}
 
-# Loop over the demographic variables and compute the ANOVA for each variable
+# Loop over the demographic variables and compute the Kruskal-Wallis H-test for each variable
 for var in ['housing_units', 'occupied_housing_units', 'median_home_value', 'population', 'median_household_income', 'population_density']:
     var_by_complaint = df.groupby('top20complaint')[var].apply(list)
-    f_stat, p_value = stats.f_oneway(*var_by_complaint)
-    anova_results[var] = {'F-statistic': f_stat, 'p-value': p_value}
+    h_stat, p_value = kruskal(*var_by_complaint)
+    kruskal_results[var] = {'H-statistic': h_stat, 'p-value': p_value}
 
-# Print the ANOVA table
-print('{:<25} {:<15} {:<15}'.format('Variable', 'F-statistic', 'p-value'))
+# Print the Kruskal-Wallis H-test table
+print('{:<25} {:<15} {:<15}'.format('Variable', 'H-statistic', 'p-value'))
 print('-' * 55)
-for var, results in anova_results.items():
-    print('{:<25} {:<15.2f} {:<15.2e}'.format(var, results['F-statistic'], results['p-value']))
-```
-:::
-
-
-## Statistical Testing
-::: {.panel-tabset}
-### Code
-
-The ANOVA test only tells us that there are differences between the groups, but not which groups are different from each other. To explore this further, we can perform a post-hoc test known as Tukey's HSD test to identify which groups are significantly different from each other.
-
-```{python}
-#| echo: true
-#| eval: false
-
-import statsmodels.stats.multicomp as mc
-
-# Create an empty dictionary to store the Tukey HSD results for each demographic variable
-tukey_results = {}
-
-# Loop over the demographic variables and compute the Tukey HSD test for each variable
-for var in ['housing_units', 'occupied_housing_units', 'median_home_value', 'population', 'median_household_income', 'population_density']:
-    var_by_complaint = df.groupby('top20complaint')[var].apply(list)
-    tukey = mc.MultiComparison(df[var], df['top20complaint'])
-    tukey_results[var] = tukey.tukeyhsd().summary()
-
-# Print the Tukey HSD results
-for var, results in tukey_results.items():
-    print(var)
-    print(results)
+for var, results in kruskal_results.items():
+    print('{:<25} {:<15.2f} {:<15.2e}'.format(var, results['H-statistic'], results['p-value']))
 ```
 ### Output
 ```{python}
 #| echo: false
 #| eval: true
 
-import statsmodels.stats.multicomp as mc
+from scipy.stats import kruskal
 
-# Create an empty dictionary to store the Tukey HSD results for each demographic variable
-tukey_results = {}
+top20complaints = df['Complaint Type'].value_counts().nlargest(20).index.tolist()
 
-# Loop over the demographic variables and compute the Tukey HSD test for each variable
+df['top20complaint'] = 'other'
+
+df = df.reset_index(drop=True)
+
+for i in range(len(df)):
+    if df.loc[i, 'Complaint Type'] in top20complaints:
+        df.loc[i, 'top20complaint'] = df.loc[i, 'Complaint Type']
+
+df = df.dropna()
+
+# Create an empty dictionary to store the H-statistic and p-value for each demographic variable
+kruskal_results = {}
+
+# Loop over the demographic variables and compute the Kruskal-Wallis H-test for each variable
 for var in ['housing_units', 'occupied_housing_units', 'median_home_value', 'population', 'median_household_income', 'population_density']:
     var_by_complaint = df.groupby('top20complaint')[var].apply(list)
-    tukey = mc.MultiComparison(df[var], df['top20complaint'])
-    tukey_results[var] = tukey.tukeyhsd().summary()
+    h_stat, p_value = kruskal(*var_by_complaint)
+    kruskal_results[var] = {'H-statistic': h_stat, 'p-value': p_value}
 
-# Print the Tukey HSD results
-for var, results in tukey_results.items():
-    print(var)
-    print(results)
+# Print the Kruskal-Wallis H-test table
+print('{:<25} {:<15} {:<15}'.format('Variable', 'H-statistic', 'p-value'))
+print('-' * 55)
+for var, results in kruskal_results.items():
+    print('{:<25} {:<15.2f} {:<15.2e}'.format(var, results['H-statistic'], results['p-value']))
+
 ```
 :::
+
+## Statistical Testing:
+- Chi-Sqaured test for Contintency: There is a significant association between Complaint Type and Borough.
+
+- Kruskal Wallis test to compare Borough & Complaint Type: Every combination of Borough has statistically different Complaint Types except Bronx vs Brooklyn and Manhattan vs Staten Island.
+
+- Chi-Squared test for Independence: Every Complaint Type is significantly different than one another between Borough.
+
+- Kruskal-Wallis test to compare demographic variables: Atleast one borough is statistically different among demographic variables.
+
+- Mann-Whitney U tests to compare the distributions of each demographic variable among the different boroughs: All combinations are statistically significant.
+
+- Kruskal Wallis test for Complaint Type and demographic variables: At least one complaint type is different among each demographic variables.
+
+# Modeling
 
 ## Modeling
 What if we want to create a model that predicts which Borough the complaint is coming from?
@@ -1035,7 +1105,7 @@ df = pd.get_dummies(df, columns=columns, drop_first=True)
 ```
 
 ## Modeling
-Finally, we can change the dependent variable, `Borough` to numerical values:
+Finally, we can change the dependent variable, `Borough` to numerical values and import the test data:
 
 ```{python}
 #| echo: true
@@ -1045,6 +1115,16 @@ borough_dict = {'brooklyn': 0, 'bronx': 1, 'queens': 2, 'manhattan': 3, 'staten 
 
 # Replace the string values with numerical values
 df['Borough'] = df['Borough'].replace(borough_dict)
+
+df_test = pd.read_csv("/Users/giovanni-lunetta/stat_3255/stat_3255_final/data/cleaned_test.csv")
+
+df.drop(['Created Hour', 'Created Day', 'Created Month',
+       'Resolution Updated Hour', 'Resolution Updated Day',
+       'Resolution Updated Month'], axis=1, inplace=True)
+
+df_test.drop(['Created Hour', 'Created Day', 'Created Month',
+       'Resolution Updated Hour', 'Resolution Updated Day',
+       'Resolution Updated Month'], axis=1, inplace=True)
 ```
 
 ## Modeling
@@ -1053,12 +1133,16 @@ Once our data is preprocessed we can split it up into test, train and validation
 #| echo: true
 
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
 
-# Split the data into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(df.drop('Borough', axis=1), df['Borough'], test_size=0.2, random_state=42)
+# Split the cleaned data into train and validation sets
+X_train, X_val, y_train, y_val = train_test_split(df.drop(['Borough'], axis=1), df['Borough'], test_size=0.2, random_state=42)
+X_test = df_test.drop(['Borough'], axis=1)
+y_test = df_test['Borough']
 
-# Split the training data into training and validation sets
-X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
+# Align the test data with the training data to add any missing columns
+X_test_aligned, X_train_aligned = X_test.align(X_train, join='outer', axis=1, fill_value=0)
+X_test = X_test_aligned.loc[:, X_train.columns]
 ```
 
 ## Modeling
@@ -1226,24 +1310,42 @@ g.set_axis_labels("Activation value", "Count")
 plt.show()
 ```
 
+## Modeling
+
+What predictors were the most important?:
+
+                     Predictor  Importance
+
+           population_density    0.314059
+
+            median_home_value    0.234184
+
+      median_household_income    0.164828
+
+                   population    0.118298
+
+                housing_units    0.114010
+
+       occupied_housing_units    0.053489
+
+               duration_hours    0.000498
+
+             day_type_weekend    0.000061
+
+                day_of_week_4    0.000048
+
+                day_of_week_3    0.000042
+
+# Conclusions
+
 ## Conclusions
 
-In terms of data in reference to Borough and Complaint Type:
+- It is important for local policy makers to identify which complaints are most common in their area and allocate resources accordingly in order to save time and money.
 
-All combinations of boroughs have signifincantly different results except for bronx vs brooklyn, and manhattan vs staten island. Therefore, we can conlclude that the distribution of complaints types across all combinations of boroughs are different (except the two noted above). Additionally, every complaint is signifincantly different among all boroughs. 
+- By analyzing complaint data, we can identify patterns and prioritize resources in a more targeted way.
 
-In terms of data in reference to Borough and Demograpics:
+- Demographic variables were found to be significant predictors for specific types of complaints.
 
-Each demographic variable is different between each set of boroughs inlcuding the boroughs that had similar complaint types as we conluded previously. 
+- Further research could be done to associate specific complaint types with demographics, allowing for even more targeted resource allocation.
 
-In terms of Complaint Type and Demographic:
-
-There are many combinations in which based on the specific demographic, the difference between complaint types are not significant, but for the most part, they are statistically significant.
-
-In terms of the neural network model:
-
-Because of our previous statistical conclusions, using demographic variables along with the other variables such as Complaint Type and duration, we would expect a model to be able to accurately predict which borough the complaint was coming from. And, although the borough of the request is known upon recieving the call, the implications of the predictors themselves can guide future research.
-
-Based on the results, the model was able to predict with strong accuracy which borough the complaints were coming from.
-
-Overall, I would suggest that it is worthwile for local policy makers across boroughs to identify which complaints are most common in their area and allocate resources accordingly in order to save time and money. In addition to this, based on the significance of demographic variables and their relationship with specific complaint types, I think further reasearch could be done to associate these complaints to specific demographics and utilize that information accordingly.
+- By using data-driven decision making, we can make more informed choices about how to allocate resources and improve the overall effectiveness of local policy.
